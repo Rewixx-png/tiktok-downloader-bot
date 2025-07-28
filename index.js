@@ -24,44 +24,55 @@ bot.on('message', (msg) => {
 
     // Проверяем, содержит ли сообщение ссылку на TikTok
     if (text && (text.includes('tiktok.com/') || text.includes('vm.tiktok.com/'))) {
-        bot.sendMessage(chatId, "⏳ Нашел! Обрабатываю ваше видео, пожалуйста, подождите...");
+        
+        // Отправляем сообщение "подождите" и сохраняем его для последующего удаления
+        bot.sendMessage(chatId, "⏳ Нашел! Обрабатываю ваше видео, пожалуйста, подождите...")
+            .then((sentMessage) => {
+                const waitingMessageId = sentMessage.message_id;
 
-        // Шаг 1: Обращаемся к API TikWM, чтобы получить прямую ссылку на видео
-        const tikwmApiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`;
+                const tikwmApiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`;
 
-        request({ url: tikwmApiUrl, json: true }, (apiError, apiResponse, apiBody) => {
-            if (apiError || apiResponse.statusCode !== 200 || !apiBody || apiBody.code !== 0) {
-                console.error('Ошибка при обращении к API TikWM:', apiError || (apiBody ? apiBody.msg : 'Unknown Error'));
-                bot.sendMessage(chatId, "❌ К сожалению, я не смог обработать эту ссылку. Возможно, она неверна или сервис временно недоступен.");
-                return;
-            }
+                request({ url: tikwmApiUrl, json: true }, (apiError, apiResponse, apiBody) => {
+                    if (apiError || apiResponse.statusCode !== 200 || !apiBody || apiBody.code !== 0) {
+                        console.error('Ошибка при обращении к API TikWM:', apiError || (apiBody ? apiBody.msg : 'Unknown Error'));
+                        bot.deleteMessage(chatId, waitingMessageId); // Удаляем "подождите"
+                        bot.sendMessage(chatId, "❌ К сожалению, я не смог обработать эту ссылку. Возможно, она неверна или сервис временно недоступен.");
+                        return;
+                    }
 
-            const videoUrl = apiBody.data.play;
-            if (!videoUrl) {
-                console.error('В ответе от TikWM не найдена ссылка на видео.');
-                bot.sendMessage(chatId, "❌ Не удалось найти видео для скачивания.");
-                return;
-            }
+                    const videoUrl = apiBody.data.play;
+                    if (!videoUrl) {
+                        console.error('В ответе от TikWM не найдена ссылка на видео.');
+                        bot.deleteMessage(chatId, waitingMessageId); // Удаляем "подождите"
+                        bot.sendMessage(chatId, "❌ Не удалось найти видео для скачивания.");
+                        return;
+                    }
 
-            // Шаг 2: Скачиваем видео по прямой ссылке в память (буфер)
-            // Используем encoding: null, чтобы получить ответ в виде необработанного буфера
-            request({ url: videoUrl, encoding: null }, (videoError, videoResponse, videoBuffer) => {
-                if (videoError || videoResponse.statusCode !== 200) {
-                    console.error('Ошибка при скачивании файла видео:', videoError);
-                    bot.sendMessage(chatId, "❌ Не удалось скачать видеофайл с сервера. Пожалуйста, попробуйте позже.");
-                    return;
-                }
+                    request({ url: videoUrl, encoding: null }, (videoError, videoResponse, videoBuffer) => {
+                        if (videoError || videoResponse.statusCode !== 200) {
+                            console.error('Ошибка при скачивании файла видео:', videoError);
+                            bot.deleteMessage(chatId, waitingMessageId); // Удаляем "подождите"
+                            bot.sendMessage(chatId, "❌ Не удалось скачать видеофайл с сервера. Пожалуйста, попробуйте позже.");
+                            return;
+                        }
 
-                // Шаг 3: Отправляем буфер с видео пользователю
-                bot.sendVideo(chatId, videoBuffer, { caption: "Вот ваше видео! ✨" })
-                    .catch(telegramError => {
-                        // Ловим ошибки от Telegram (например, если файл слишком большой)
-                        console.error('Ошибка при отправке видео в Telegram:', telegramError.message);
-                        bot.sendMessage(chatId, `❌ Произошла ошибка при отправке видео. (Код ошибки: ${telegramError.code})`);
+                        // Отправляем видео, а затем удаляем сообщение "подождите"
+                        bot.sendVideo(chatId, videoBuffer, { caption: "Вот ваше видео! ✨" })
+                            .then(() => {
+                                bot.deleteMessage(chatId, waitingMessageId);
+                            })
+                            .catch(telegramError => {
+                                console.error('Ошибка при отправке видео в Telegram:', telegramError.message);
+                                bot.deleteMessage(chatId, waitingMessageId); // Удаляем "подождите" даже при ошибке отправки
+                                bot.sendMessage(chatId, `❌ Произошла ошибка при отправке видео. (Код ошибки: ${telegramError.code})`);
+                            });
                     });
+                });
+            }).catch(err => {
+                console.error("Не удалось отправить сообщение 'подождите':", err);
             });
-        });
-    } else {
+
+    } else if (msg.text) { // Добавил проверку, что msg.text существует
         bot.sendMessage(chatId, "Это не похоже на ссылку TikTok. Пожалуйста, отправьте действительную ссылку.");
     }
 });
