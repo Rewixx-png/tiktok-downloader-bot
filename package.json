@@ -1,0 +1,24 @@
+{
+  "name": "tiktok-downloader",
+  "version": "1.0.0",
+  "description": "## Description This bot allows users to download TikTok videos without a watermark directly from Telegram. The bot uses the [unoffical TikTok API by TikWM](https://www.tikwm.com) to fetch the video and then sends it back to the user.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edizbaha/tiktok-downloader.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/edizbaha/tiktok-downloader/issues"
+  },
+  "homepage": "https://github.com/edizbaha/tiktok-downloader#readme",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "request": "^2.88.2"
+  }
+}
